@@ -8,14 +8,6 @@ using DurationInMs = std::chrono::duration<double, std::milli>;
 
 void lab3()
 {
-  // Open video stream from camera.
-  const int camera_id = 1; // Should be 0 or 1 on the lab PCs.
-  cv::VideoCapture cap(camera_id);
-  if (!cap.isOpened())
-  {
-    throw std::runtime_error("Could not open camera");
-  }
-
   // Create window.
   const std::string win_name = "Lab 3: Corner detection";
   cv::namedWindow(win_name);
@@ -29,9 +21,9 @@ void lab3()
   CircleEstimator estimator;
   for (;;)
   {
-    // Read a frame from the camera.
+    // Read a frame from file.
     cv::Mat frame;
-    cap >> frame;
+    frame = cv::imread("chessboard.png");
 
     if (frame.empty())
     { break; }
