@@ -17,46 +17,52 @@ CornerDetector::CornerDetector(CornerMetric metric,
 std::vector<cv::KeyPoint> CornerDetector::detect(cv::Mat image) const
 {
   // Estimate image gradients Ix and Iy using g_kernel_ and dg_kernel.
-  // Todo: Step 2: Estimate image gradients Ix and Iy using g_kernel_ and dg_kernel_.
   cv::Mat Ix;
   cv::Mat Iy;
+  cv::filter2D(image, Ix, -1, g_kernel_);
+  cv::filter2D(image, Iy, -1, dg_kernel_);
 
   // Compute the elements of M; A, B and C from Ix and Iy.
-  // Todo: Step 3: Compute the elements of M; A, B and C from Ix and Iy.
-  cv::Mat A;
-  cv::Mat B;
-  cv::Mat C;
+  cv::Mat A = Ix.mul(Ix);
+  cv::Mat B = Ix.mul(Iy);
+  cv::Mat C = Iy.mul(Iy);
 
   // Apply the windowing gaussian win_kernel_ on A, B and C.
-  // Todo: Step 3: Apply the windowing gaussian.
+  cv::filter2D(A, A, -1, win_kernel_);
+  cv::filter2D(B, B, -1, win_kernel_);
+  cv::filter2D(C, C, -1, win_kernel_);
 
   // Compute corner response.
-  // Todo: Step 4: Finish all the corner response functions.
   cv::Mat response;
   switch (metric_type_)
   {
   case CornerMetric::harris:
-    response = harrisMetric(A, B, C); break;
+    response = harrisMetric(A, B, C);
+    break;
 
   case CornerMetric::harmonic_mean:
-    response = harmonicMeanMetric(A, B, C); break;
+    response = harmonicMeanMetric(A, B, C);
+    break;
 
   case CornerMetric::min_eigen:
-    response = minEigenMetric(A, B, C); break;
+    response = minEigenMetric(A, B, C);
+    break;
   }
 
-  // Todo: Step 5: Dilate image to make each pixel equal to the maximum in the neighborhood.
+  // Dilate image to make each pixel equal to the maximum in the neighborhood.
   cv::Mat local_max;
+  cv::dilate(response, local_max, cv::Mat());
 
-  // Todo: Step 6: Compute the threshold.
-  // Compute the threshold by using quality_level_ on the maximum response.
-  double max_val(0.0);
+  // Compute the threshold.
+  double max_val;
+  cv::minMaxLoc(response, nullptr, &max_val);
+  double threshold = quality_level_ * max_val;
 
-  // Todo: Step 7: Extract local maxima above threshold.
-  cv::Mat is_strong_and_local_max; // = response > threshold and response == local_max
+  // Extract local maxima above threshold.
+  cv::Mat is_strong_and_local_max = (response > threshold) & (response == local_max);
   std::vector<cv::Point> max_locations;
+  cv::findNonZero(is_strong_and_local_max, max_locations);
 
-  // ----- Now detect() is finished! -----
   // Add all strong local maxima as keypoints.
   const float keypoint_size = 3.0f * window_sigma_;
   std::vector<cv::KeyPoint> key_points;
@@ -68,13 +74,13 @@ std::vector<cv::KeyPoint> CornerDetector::detect(cv::Mat image) const
   // Show additional debug/educational figures.
   if (do_visualize_)
   {
-    if (!Ix.empty()) { cv::imshow("Gradient Ix", Ix); };
-    if (!Iy.empty()) { cv::imshow("Gradient Iy", Iy); };
-    if (!A.empty()) { cv::imshow("Image A", A); };
-    if (!B.empty()) { cv::imshow("Image B", B); };
-    if (!C.empty()) { cv::imshow("Image C", C); };
-    if (!response.empty()) { cv::imshow("Response", response/(0.9*max_val)); };
-    if (!is_strong_and_local_max.empty()) { cv::imshow("Local max", is_strong_and_local_max); };
+    if (!Ix.empty()) { cv::imshow("Gradient Ix", Ix); }
+    if (!Iy.empty()) { cv::imshow("Gradient Iy", Iy); }
+    if (!A.empty()) { cv::imshow("Image A", A); }
+    if (!B.empty()) { cv::imshow("Image B", B); }
+    if (!C.empty()) { cv::imshow("Image C", C); }
+    if (!response.empty()) { cv::imshow("Response", response / (0.9 * max_val)); }
+    if (!is_strong_and_local_max.empty()) { cv::imshow("Local max", is_strong_and_local_max); }
   }
 
   return key_points;
@@ -83,23 +89,52 @@ std::vector<cv::KeyPoint> CornerDetector::detect(cv::Mat image) const
 cv::Mat CornerDetector::harrisMetric(cv::Mat& A, cv::Mat& B, cv::Mat& C) const
 {
   // Compute the Harris metric for each pixel.
-  // Todo: Step 4: Finish all the corner response functions.
   const float alpha = 0.06f;
+  cv::Mat response;
 
-  return cv::Mat();
+  // Calculate the determinant and trace of the matrix M
+  cv::Mat det_M = A.mul(C) - B.mul(B);
+  cv::Mat trace_M = A + C;
+
+  // Compute the Harris response
+  response = det_M - alpha * trace_M.mul(trace_M);
+
+  // Set negative values to zero
+  response = cv::max(response, 0.0);
+
+  return response;
 }
 
 cv::Mat CornerDetector::harmonicMeanMetric(cv::Mat& A, cv::Mat& B, cv::Mat& C) const
 {
   // Compute the Harmonic mean metric for each pixel.
-  // Todo: Step 4: Finish all the corner response functions.
-  return cv::Mat();
+  cv::Mat response;
+
+  // Compute the Harmonic mean response
+  response = (A.mul(C)) / (A + C);
+
+  return response;
 }
 
 cv::Mat CornerDetector::minEigenMetric(cv::Mat& A, cv::Mat& B, cv::Mat& C) const
 {
   // Compute the Min. Eigen metric for each pixel.
-  // Todo: Step 4: Finish all the corner response functions.
-  return cv::Mat();
+  cv::Mat response;
+
+  // Compute eigenvalues of M
+  cv::Mat M = cv::Mat::zeros(A.size(), CV_32FC3);
+  M.at<cv::Vec3f>(0) = A;
+  M.at<cv::Vec3f>(1) = B;
+  M.at<cv::Vec3f>(2) = C;
+
+  cv::Mat eigenvalues;
+  cv::eigen(M, eigenvalues);
+
+  // Compute the minimum eigenvalue response
+  cv::Mat lambda1 = eigenvalues.row(0);
+  cv::Mat lambda2 = eigenvalues.row(1);
+  response = cv::min(lambda1, lambda2);
+
+  return response;
 }
 

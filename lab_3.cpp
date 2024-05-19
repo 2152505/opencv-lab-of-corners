@@ -8,6 +8,8 @@ using DurationInMs = std::chrono::duration<double, std::milli>;
 
 void lab3()
 {
+  //test if we are in the function.
+  std::cout<<"We are now in Lab3"<<std::endl;
   // Create window.
   const std::string win_name = "Lab 3: Corner detection";
   cv::namedWindow(win_name);
@@ -19,18 +21,28 @@ void lab3()
 
   // Construct the circle estimator.
   CircleEstimator estimator;
+
   for (;;)
   {
     // Read a frame from file.
     cv::Mat frame;
-    frame = cv::imread("chessboard.png");
+    frame = cv::imread("../chessboard.png");
 
     if (frame.empty())
-    { break; }
-
+    { 
+      std::cout<<"the images cannot be read,please check."<<std::endl;
+      break; 
+    }
+    else{
+      cv::imshow("Original images",frame);
+      //test the appearence of the images is right or not
+    }
     // Convert frame to gray scale image.
     cv::Mat gray_frame;
     cv::cvtColor(frame, gray_frame, cv::COLOR_BGR2GRAY);
+    cv::imshow("Grey images",gray_frame);
+    //test the convert is well or not
+
 
     // Perform corner detection.
     // Measure how long the processing takes.
